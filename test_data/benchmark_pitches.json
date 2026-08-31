@@ -1,0 +1,46 @@
+[
+  {
+    "title": "Orbital Decay",
+    "genre": "Sci-Fi",
+    "budget": "$45,000,000",
+    "target_audience": "Adults 25-49; hybrid theatrical release followed by mid-window SVOD streaming",
+    "logline": "When a routine maintenance crew on a low-Earth orbit satellite array loses communication with ground control during a global blackout, they must pilot a damaged supply shuttle back to an unpowered Earth while dodging hyper-velocity space debris.",
+    "comps": [
+      "Gravity (2013)",
+      "The Martian (2015)"
+    ]
+  },
+  {
+    "title": "Rustbelt Sonata",
+    "genre": "Indie Drama",
+    "budget": "$1,800,000",
+    "target_audience": "Adults 35-65; festival circuit (Sundance/Telluride) targeting specialized platform theatrical and micro-budget PVOD release",
+    "logline": "A disgraced classical pianist returns to her dying Ohio industrial hometown to care for her estranged, ailing father and takes a job teaching music at a underfunded community center facing imminent demolition.",
+    "comps": [
+      "Manchester by the Sea (2016)",
+      "Drive My Car (2021)"
+    ]
+  },
+  {
+    "title": "Apex Velocity",
+    "genre": "Action",
+    "budget": "$180,000,000",
+    "target_audience": "Males and Females 18-49; wide global theatrical release with premium large-format (IMAX/Dolby Cinema) rollout",
+    "logline": "A veteran off-road endurance racer is coerced back into the driver's seat by defense contractors to pilot an experimental, high-speed tactical prototype through a hostile desert warzone to rescue stranded engineers before enemy forces breach the border.",
+    "comps": [
+      "Top Gun: Maverick (2022)",
+      "F1 (2025)"
+    ]
+  },
+  {
+    "title": "Drafting Love",
+    "genre": "Romantic Comedy",
+    "budget": "$22,000,000",
+    "target_audience": "Females 18-49; direct-to-streaming SVOD premiere with targeted holiday window push",
+    "logline": "Two rival fantasy sports strategists accidentally sign up for the same co-living apartment lease during a city housing crunch and must navigate their growing attraction while competing for the same executive sports-analytics promotion.",
+    "comps": [
+      "Set It Up (2018)",
+      "The Hating Game (2021)"
+    ]
+  }
+]
