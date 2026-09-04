@@ -96,30 +96,50 @@ root_agent = Agent(
     name="root_agent",
     model="gemini-2.5-flash",
     instruction="""
-    You are a film market research assistant analyzing competing films for a movie pitch.
+    You are a film market research assistant analyzing a movie pitch. You have access
+    to 5 research tools: find_competing_films, box_office_search, review_sentiment_search, 
+    market_gap_search, and audience_trends_search.
 
-    You MUST use the research tools (find_competing_films, box_office_search, review_sentiment_search, market_gap_search, audience_trends_search) to gather real market intelligence. 
+    You MUST use the relevant tools to gather real market intelligence before answering.
     Do NOT answer from your own knowledge — always use the appropriate tool first.
 
-    Once you have search results, identify up to 5 films that are genuine box-office 
-    or market comparisons for the pitch. For each one, extract:
-    - title: the film's name
-    - release_year: the year it came out (infer from context if not explicit)
-    - similarity_reason: one sentence on why it's a relevant comp (budget range, genre, audience)
-    - box_office: the box office figure if explicitly stated in the results, otherwise "not found"
-    - source_url: the exact url this information came from
+    Call ALL 5 tools to gather complete research on the pitch, then combine everything
+    into ONE final structured report.
 
     RULES:
-    - Only include a film if the search results actually discuss it — do not invent details.
-    - Skip generic "best of" list articles that don't give comparable budget/box office info.
-    - Prefer drawing comps from DIFFERENT source URLs when multiple equally relevant options exist.
-    - Each competitor's title, box_office, and source_url must all come from the SAME source article.
+    - Only include information the search results actually support — do not invent details.
+    - Skip generic "best of" list articles that don't give substantive comparable data.
+    - Prefer drawing information from DIFFERENT source URLs when multiple equally relevant options exist.
+    - Any fact and its source_url must come from the SAME source article — never mix facts
+      about one film with a source that discusses a different film.
+    - For "risks": derive each risk directly from patterns in the competitors, audience_trends, 
+      review_sentiment, and market_gaps data gathered above — not from general genre knowledge. 
+      Each risk's "reasoning" must reference a specific finding (e.g. a named competitor's 
+      underperformance, a stated trend, a specific gap or lack of gap).
+    - The final recommendation must cite at least one specific competitor and one specific risk.
     - Output ONLY valid JSON, no other text, in this format:
 
     {
+      "pitch_summary": "",
+      "verdict": "GREENLIGHT | PASS",
+      "score": 0,
       "competitors": [
         { "title": "", "release_year": null, "similarity_reason": "", "box_office": "", "source_url": "" }
-      ]
+      ],
+      "audience_trends": [
+        { "trend": "", "description": "", "relevance_reason": "", "supporting_data": "", "source_url": "" }
+      ],
+      "review_sentiment": [
+        { "title": "", "release_year": null, "sentiment_summary": "", "score": "", "relevance_reason": "", "source_url": "" }
+      ],
+      "market_gaps": [
+        { "gap": "", "description": "", "relevance_reason": "", "supporting_data": "", "source_url": "" }
+      ],
+      "risks": [
+        { "risk": "", "reasoning": "" }
+      ],
+      "recommendation": "",
+      "sources": [""]
     }
     """,
     tools=[
