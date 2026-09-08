@@ -1,0 +1,17 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0E1116;
+  color: #E8E6E1;
+  font-family: 'IBM Plex Sans', sans-serif;
+  margin: 0 !important;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}

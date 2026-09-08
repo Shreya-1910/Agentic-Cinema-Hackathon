@@ -1,0 +1,18 @@
+[
+  {
+    "title": "Orbital Decay",
+    "genre": "Sci-Fi",
+    "budget": "$45,000,000",
+    "target_audience": "Adults 25-49; hybrid theatrical release followed by mid-window SVOD streaming",
+    "logline": "When a routine maintenance crew on a low-Earth orbit satellite array loses communication with ground control during a global blackout, they must pilot a damaged supply shuttle back to an unpowered Earth while dodging hyper-velocity space debris.",
+    "why_safe_for_demo": "Mainstream sci-fi genre with abundant comps (Gravity, The Martian) and heavy trade press coverage — search returns rich, consistent data across all 5 categories."
+  },
+  {
+    "title": "Apex Velocity",
+    "genre": "Action",
+    "budget": "$180,000,000",
+    "target_audience": "Males and Females 18-49; wide global theatrical release with premium large-format rollout",
+    "logline": "A veteran off-road endurance racer is coerced back into the driver's seat by defense contractors to pilot an experimental, high-speed tactical prototype through a hostile desert warzone to rescue stranded engineers before enemy forces breach the border.",
+    "why_safe_for_demo": "Tentpole action has the deepest box office and review data available online — lowest risk of thin/missing data during a live judging fallback."
+  }
+]
