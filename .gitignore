@@ -1,7 +1,51 @@
-# .gitignore
+# Environment variables
 .env
 .env.local
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+
+# Node / frontend
 node_modules/
 .next/
+.vite/
+
+# ADK local cache
+.adk/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+
+# GCP / credentials
+service-account*.json
+adc.json
+
+# Shell history
+.bash_history
+.codeoss/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
