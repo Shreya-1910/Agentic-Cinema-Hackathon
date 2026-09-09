@@ -96,8 +96,6 @@ npm install
 npm run dev
 ```
 
-## Demo
-
 ## Live Project 
 https://cinemahackathon.vercel.app
 
