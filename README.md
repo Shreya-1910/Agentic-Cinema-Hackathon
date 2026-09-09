@@ -3,7 +3,7 @@
 
 ## What it Does 
 
-A producer describes a film pitch in plain language (genre, budget, target audience). The agent researches the live market - competing films, box office performance, audience trends, critical reception, and market gaps by using Parallel's Search API . It then synthesises everything into a structured Greenlight Report: a verdict (Pass or Fail), a confidence score, name comps with sources, risks and a final recommendation.
+A producer describes a film pitch in plain language (genre, budget, target audience). The agent researches the live market - competing films, box office performance, audience trends, critical reception, and market gaps by using Parallel's Search API. It then synthesises everything into a structured Greenlight Report: a verdict (Greenlight or Pass), a confidence score, name comps with sources, risks and a final recommendation.
 
 This turns a research process that would normally take a studio analyst hours or days into a single request, with every claim traceable to a real source.
 
