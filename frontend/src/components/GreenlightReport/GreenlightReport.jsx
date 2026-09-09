@@ -221,12 +221,9 @@ function SectionHeading({ eyebrow, children }) {
   );
 }
 
-// ============================================================
-// HELPERS
-// ============================================================
 
 function normalizeVerdict(verdict, score) {
-  // The backend research score is the source of truth.
+  // Backend score is the source of truth.
   // 50 and above = Greenlit
   // Below 50 = Failed
   if (
@@ -278,9 +275,7 @@ function extractAudience(text) {
   return match ? match[0] : "Not specified";
 }
 
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
+
 
 export default function GreenlightReport() {
   const [pitch, setPitch] = useState(
@@ -294,10 +289,6 @@ export default function GreenlightReport() {
 
   const timers = useRef([]);
 
-  // ============================================================
-  // RUN BACKEND RESEARCH
-  // ============================================================
-
   const runResearch = async () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
@@ -307,7 +298,9 @@ export default function GreenlightReport() {
     setError(null);
     setReportData(null);
 
-    // Animate research steps
+    // Animate research steps.
+    // These are visual indicators only.
+    // The backend may take longer than this animation.
     STEPS.forEach((_, i) => {
       const timer = setTimeout(() => {
         setVisibleSteps(i + 1);
@@ -362,13 +355,14 @@ export default function GreenlightReport() {
         result
       );
 
-      // IMPORTANT:
       // Save the EXACT backend JSON.
       setReportData(result);
 
+      // Only mark the final step as complete
+      // once the backend has actually returned.
       setVisibleSteps(STEPS.length);
 
-      // Show report
+      // Show report.
       setPhase("report");
     } catch (err) {
       console.error(
@@ -388,9 +382,7 @@ export default function GreenlightReport() {
     }
   };
 
-  // ============================================================
-  // RESET
-  // ============================================================
+
 
   const reset = () => {
     timers.current.forEach(clearTimeout);
@@ -402,13 +394,9 @@ export default function GreenlightReport() {
     setError(null);
   };
 
-  // ============================================================
-  // DATA FROM BACKEND
-  // ============================================================
 
   const data = reportData
     ? {
-        // SCORE NOW DETERMINES THE VERDICT
         verdict: normalizeVerdict(
           reportData.verdict,
           reportData.score
@@ -467,9 +455,7 @@ export default function GreenlightReport() {
     VERDICT_COPY[data?.verdict] ||
     VERDICT_COPY.caution;
 
-  // ============================================================
-  // UI
-  // ============================================================
+
 
   return (
     <div
@@ -486,6 +472,49 @@ export default function GreenlightReport() {
         overflow: "hidden",
       }}
     >
+      {/* Loading animation */}
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 0.3;
+              transform: scale(0.8);
+            }
+
+            50% {
+              opacity: 1;
+              transform: scale(1.15);
+            }
+          }
+
+          @keyframes loadingDots {
+            0%, 20% {
+              opacity: 0;
+            }
+
+            50% {
+              opacity: 1;
+            }
+
+            100% {
+              opacity: 0;
+            }
+          }
+
+          .loading-dot-1 {
+            animation: loadingDots 1.4s infinite;
+          }
+
+          .loading-dot-2 {
+            animation: loadingDots 1.4s infinite 0.2s;
+          }
+
+          .loading-dot-3 {
+            animation: loadingDots 1.4s infinite 0.4s;
+          }
+        `}
+      </style>
+
       <FilmStrip position="top" />
 
       {/* Paper texture */}
@@ -508,9 +537,7 @@ export default function GreenlightReport() {
           position: "relative",
         }}
       >
-        {/* ====================================================
-            FORM
-        ==================================================== */}
+    
 
         {phase === "form" && (
           <div>
@@ -701,9 +728,7 @@ export default function GreenlightReport() {
           </div>
         )}
 
-        {/* ====================================================
-            RESEARCHING
-        ==================================================== */}
+    
 
         {phase === "researching" && (
           <div
@@ -742,109 +767,230 @@ export default function GreenlightReport() {
                   "Georgia, 'Times New Roman', serif",
                 fontStyle: "italic",
                 color: "#8B755C",
-                margin:
-                  "8px 0 30px",
+                margin: "8px 0 8px",
                 fontSize: 14,
               }}
             >
               Consulting the archives
             </p>
 
+            {/* Important waiting message */}
+            <p
+              style={{
+                margin: "0 auto 30px",
+                maxWidth: 480,
+                fontFamily:
+                  "'Trebuchet MS', Arial, sans-serif",
+                fontSize: 12,
+                color: "#806F5B",
+                lineHeight: 1.6,
+              }}
+            >
+              Your report is being prepared. This may
+              take a little while while the research
+              agents gather and analyze the latest
+              information.
+            </p>
+
             <div
               style={{
                 background: "#F5EBD8",
-                border:
-                  "1px solid #C9B99D",
+                border: "1px solid #C9B99D",
                 padding: "24px 30px",
                 textAlign: "left",
                 boxShadow:
                   "0 10px 28px rgba(76,57,37,0.10)",
               }}
             >
-              {STEPS.map((step, i) => (
-                <div
-                  key={step}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 13,
-                    padding: "11px 0",
-                    opacity:
-                      i < visibleSteps
+              {STEPS.map((step, i) => {
+                const isComplete =
+                  i < visibleSteps;
+
+                const isLastStep =
+                  i === STEPS.length - 1;
+
+                return (
+                  <div
+                    key={step}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 13,
+                      padding: "11px 0",
+                      opacity: isComplete
                         ? 1
                         : 0.28,
-                    transition:
-                      "opacity 0.4s ease",
-                    borderBottom:
-                      i !==
-                      STEPS.length - 1
-                        ? "1px dotted #C8B79A"
-                        : "none",
+                      transition:
+                        "opacity 0.4s ease",
+                      borderBottom:
+                        i !== STEPS.length - 1
+                          ? "1px dotted #C8B79A"
+                          : "none",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 18,
+                        height: 18,
+                        border:
+                          "1px solid #A88D69",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent:
+                          "center",
+                        fontSize: 9,
+                        color: isComplete
+                          ? "#7E403A"
+                          : "#A4937B",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isComplete
+                        ? "✓"
+                        : "○"}
+                    </span>
+
+                    <span
+                      style={{
+                        fontFamily:
+                          "Georgia, 'Times New Roman', serif",
+                        fontSize: 15,
+                        color: isComplete
+                          ? "#493C30"
+                          : "#9A896F",
+                      }}
+                    >
+                      {step}
+                    </span>
+
+                    {isComplete && (
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          fontSize: 9,
+                          color: "#607A50",
+                          textTransform:
+                            "uppercase",
+                          letterSpacing:
+                            "0.1em",
+                        }}
+                      >
+                        done
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+
+             
+
+              <div
+                style={{
+                  marginTop: 20,
+                  paddingTop: 18,
+                  borderTop:
+                    "1px solid #C8B79A",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "center",
+                    alignItems: "center",
+                    gap: 7,
+                    marginBottom: 8,
                   }}
                 >
                   <span
                     style={{
-                      width: 18,
-                      height: 18,
-                      border:
-                        "1px solid #A88D69",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent:
-                        "center",
-                      fontSize: 9,
-                      color:
-                        i < visibleSteps
-                          ? "#7E403A"
-                          : "#A4937B",
-                      flexShrink: 0,
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "#7E403A",
+                      animation:
+                        "pulse 1.2s infinite",
+                      display: "inline-block",
                     }}
-                  >
-                    {i < visibleSteps
-                      ? "✓"
-                      : "○"}
-                  </span>
+                  />
 
                   <span
                     style={{
                       fontFamily:
                         "Georgia, 'Times New Roman', serif",
-                      fontSize: 15,
-                      color:
-                        i < visibleSteps
-                          ? "#493C30"
-                          : "#9A896F",
+                      fontSize: 13,
+                      color: "#6F604F",
                     }}
                   >
-                    {step}
+                    Preparing your report
                   </span>
 
-                  {i <
-                    visibleSteps && (
-                    <span
-                      style={{
-                        marginLeft:
-                          "auto",
-                        fontSize: 9,
-                        color: "#607A50",
-                        textTransform:
-                          "uppercase",
-                        letterSpacing:
-                          "0.1em",
-                      }}
-                    >
-                      done
-                    </span>
-                  )}
+                  <span
+                    className="loading-dot-1"
+                    style={{
+                      fontFamily:
+                        "Georgia, 'Times New Roman', serif",
+                      color: "#7E403A",
+                    }}
+                  >
+                    .
+                  </span>
+
+                  <span
+                    className="loading-dot-2"
+                    style={{
+                      fontFamily:
+                        "Georgia, 'Times New Roman', serif",
+                      color: "#7E403A",
+                    }}
+                  >
+                    .
+                  </span>
+
+                  <span
+                    className="loading-dot-3"
+                    style={{
+                      fontFamily:
+                        "Georgia, 'Times New Roman', serif",
+                      color: "#7E403A",
+                    }}
+                  >
+                    .
+                  </span>
                 </div>
-              ))}
+
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 10,
+                    color: "#927D63",
+                    fontStyle: "italic",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Please give the research a
+                  moment to finish.
+                </p>
+              </div>
             </div>
+
+            {/* Extra reassurance below the box */}
+            <p
+              style={{
+                marginTop: 18,
+                fontSize: 10,
+                color: "#9A896F",
+                lineHeight: 1.5,
+              }}
+            >
+              The report will appear automatically
+              once the research is complete.
+            </p>
           </div>
         )}
 
-        {/* ====================================================
-            REPORT
-        ==================================================== */}
+     
 
         {phase === "report" &&
           data && (
@@ -860,10 +1006,8 @@ export default function GreenlightReport() {
                   style={{
                     margin: 0,
                     fontSize: 9,
-                    letterSpacing:
-                      "0.25em",
-                    textTransform:
-                      "uppercase",
+                    letterSpacing: "0.25em",
+                    textTransform: "uppercase",
                     color: "#967A58",
                     fontWeight: 700,
                   }}
@@ -878,8 +1022,7 @@ export default function GreenlightReport() {
                       "Georgia, 'Times New Roman', serif",
                     fontSize: 37,
                     fontWeight: 500,
-                    margin:
-                      "8px 0 0",
+                    margin: "8px 0 0",
                     color: "#382E27",
                   }}
                 >
@@ -893,8 +1036,7 @@ export default function GreenlightReport() {
                     fontStyle: "italic",
                     color: "#90775A",
                     fontSize: 12,
-                    margin:
-                      "6px 0 0",
+                    margin: "6px 0 0",
                   }}
                 >
                   Market intelligence ·
@@ -917,34 +1059,28 @@ export default function GreenlightReport() {
               >
                 <div
                   style={{
-                    position:
-                      "absolute",
+                    position: "absolute",
                     top: 13,
                     left: 13,
                     right: 13,
                     bottom: 13,
                     border:
                       "1px solid rgba(158,127,87,0.22)",
-                    pointerEvents:
-                      "none",
+                    pointerEvents: "none",
                   }}
                 />
 
                 <div
                   style={{
-                    position:
-                      "relative",
+                    position: "relative",
                   }}
                 >
-                  {/* ==================================================
-                      VERDICT
-                  ================================================== */}
+                
 
                   <div
                     style={{
                       display: "flex",
-                      alignItems:
-                        "center",
+                      alignItems: "center",
                       gap: 25,
                       paddingBottom: 25,
                     }}
@@ -1009,9 +1145,7 @@ export default function GreenlightReport() {
 
                   <OrnamentalDivider />
 
-                  {/* ==================================================
-                      PITCH SUMMARY
-                  ================================================== */}
+             
 
                   <section>
                     <SectionHeading eyebrow="The project">
@@ -1048,9 +1182,7 @@ export default function GreenlightReport() {
 
                   <OrnamentalDivider />
 
-                  {/* ==================================================
-                      SCORE / AUDIENCE / BUDGET
-                  ================================================== */}
+          
 
                   <div
                     style={{
@@ -1198,9 +1330,7 @@ export default function GreenlightReport() {
 
                   <OrnamentalDivider />
 
-                  {/* ==================================================
-                      COMPETITORS
-                  ================================================== */}
+          
 
                   <section>
                     <SectionHeading eyebrow="The competition">
@@ -1363,9 +1493,7 @@ export default function GreenlightReport() {
 
                   <OrnamentalDivider />
 
-                  {/* ==================================================
-                      AUDIENCE TRENDS
-                  ================================================== */}
+              
 
                   <section>
                     <SectionHeading eyebrow="Audience intelligence">
@@ -1380,8 +1508,7 @@ export default function GreenlightReport() {
                             "0 0 18px",
                           fontFamily:
                             "Georgia, 'Times New Roman', serif",
-                          fontStyle:
-                            "italic",
+                          fontStyle: "italic",
                           fontSize: 14,
                           lineHeight:
                             1.7,
@@ -1448,9 +1575,7 @@ export default function GreenlightReport() {
 
                   <OrnamentalDivider />
 
-                  {/* ==================================================
-                      REVIEW SENTIMENT
-                  ================================================== */}
+            
 
                   <section
                     style={{
@@ -1521,9 +1646,7 @@ export default function GreenlightReport() {
 
                   <OrnamentalDivider />
 
-                  {/* ==================================================
-                      MARKET GAP
-                  ================================================== */}
+                 
 
                   <section
                     style={{
@@ -1545,8 +1668,7 @@ export default function GreenlightReport() {
                         fontFamily:
                           "Georgia, 'Times New Roman', serif",
                         fontSize: 15,
-                        lineHeight:
-                          1.7,
+                        lineHeight: 1.7,
                         color:
                           "#5D4E40",
                       }}
@@ -1601,7 +1723,9 @@ export default function GreenlightReport() {
                                 key={
                                   index
                                 }
-                                href={url}
+                                href={
+                                  url
+                                }
                                 target="_blank"
                                 rel="noreferrer"
                                 style={{
@@ -1629,9 +1753,6 @@ export default function GreenlightReport() {
 
                   <OrnamentalDivider />
 
-                  {/* ==================================================
-                      RISKS
-                  ================================================== */}
 
                   <section>
                     <SectionHeading eyebrow="Proceed thoughtfully">
@@ -1733,9 +1854,6 @@ export default function GreenlightReport() {
 
                   <OrnamentalDivider />
 
-                  {/* ==================================================
-                      RECOMMENDATION
-                  ================================================== */}
 
                   <section>
                     <SectionHeading eyebrow="The studio's call">
@@ -1772,10 +1890,6 @@ export default function GreenlightReport() {
                   </section>
 
                   <OrnamentalDivider />
-
-                  {/* ==================================================
-                      ALL SOURCES
-                  ================================================== */}
 
                   <section>
                     <SectionHeading eyebrow="Research trail">
@@ -1858,8 +1972,7 @@ export default function GreenlightReport() {
                       paddingTop: 20,
                       borderTop:
                         "1px solid #BFAE91",
-                      textAlign:
-                        "center",
+                      textAlign: "center",
                     }}
                   >
                     <p
@@ -1919,7 +2032,7 @@ export default function GreenlightReport() {
                       "0.04em",
                   }}
                 >
-                  ↩ Review another picture
+                  Review another picture
                 </button>
               </div>
             </div>
