@@ -1,120 +1,5 @@
 import { useState, useRef } from "react";
-
-const FIXTURES = {
-  greenlight: {
-    verdict: "greenlight",
-    confidence: "High",
-    score: 78,
-    project: "Untitled Sci-Fi Thriller",
-    budget: "$30M",
-    audience: "18–35",
-    rationale:
-      "Strong genre demand and a release-calendar gap in Q3 outweigh a crowded comp set.",
-    competitors: [
-      {
-        title: "Aftershock",
-        year: "2025",
-        studio: "Legendary",
-        boxOffice: "$142M",
-        note: "Closest tonal comp",
-      },
-      {
-        title: "The Drift",
-        year: "2024",
-        studio: "A24",
-        boxOffice: "$61M",
-        note: "Lower budget, similar premise",
-      },
-      {
-        title: "Horizon Zero",
-        year: "2025",
-        studio: "Universal",
-        boxOffice: "$208M",
-        note: "Bigger scale, different tone",
-      },
-    ],
-    trends: [
-      "Original sci-fi thrillers are outperforming franchise entries with the 18–35 demo since early 2025.",
-      "Streaming pre-sales for mid-budget thrillers have climbed for three consecutive quarters.",
-      "Reviews reward practical effects and grounded tone over spectacle in this genre right now.",
-    ],
-    marketGap:
-      "No major studio has a sci-fi thriller dated for Q3 next year. The two closest comps released 14+ months ago, leaving room before audience fatigue sets in.",
-    risks: [
-      {
-        text: "Original IP without a built-in audience",
-        severity: "amber",
-      },
-      {
-        text: "Thriller pacing is hard to market in a 30-second trailer",
-        severity: "amber",
-      },
-      {
-        text: "Two competitors are already in production with overlapping premises",
-        severity: "red",
-      },
-      {
-        text: "Target demo's theatrical attendance has softened slightly year over year",
-        severity: "amber",
-      },
-    ],
-  },
-
-  pass: {
-    verdict: "pass",
-    confidence: "Moderate",
-    score: 34,
-    project: "Untitled Sci-Fi Thriller",
-    budget: "$30M",
-    audience: "18–35",
-    rationale:
-      "Market is saturated for this exact premise, and none of the recent comps recouped budget theatrically.",
-    competitors: [
-      {
-        title: "Aftershock",
-        year: "2025",
-        studio: "Legendary",
-        boxOffice: "$142M",
-        note: "Nearly identical premise",
-      },
-      {
-        title: "Silent Orbit",
-        year: "2025",
-        studio: "Sony",
-        boxOffice: "$38M",
-        note: "Underperformed, similar budget",
-      },
-      {
-        title: "The Drift",
-        year: "2024",
-        studio: "A24",
-        boxOffice: "$61M",
-        note: "Lower budget, similar premise",
-      },
-    ],
-    trends: [
-      "Four sci-fi thrillers with a near-identical logline have released in the past 18 months.",
-      "Audience surveys show early fatigue signals for this specific subgenre.",
-      "Reviews increasingly cite premise repetition as a criticism across the comp set.",
-    ],
-    marketGap:
-      "No clear white space — three studios have released or announced adjacent projects in the same 12-month window.",
-    risks: [
-      {
-        text: "Premise overlaps heavily with two recent releases",
-        severity: "red",
-      },
-      {
-        text: "Comp set shows a declining box office trend",
-        severity: "red",
-      },
-      {
-        text: "Subgenre fatigue signals in recent audience surveys",
-        severity: "amber",
-      },
-    ],
-  },
-};
+import { addAppLog } from "../../utils/appLogs";
 
 const STEPS = [
   "Searching competing films",
@@ -137,7 +22,7 @@ const VERDICT_COPY = {
     seal: "!",
   },
   pass: {
-    label: "Pass",
+    label: "Failed",
     color: "#91483F",
     seal: "×",
   },
@@ -220,7 +105,8 @@ function OrnamentalDivider() {
 }
 
 function VerdictSeal({ verdict }) {
-  const info = VERDICT_COPY[verdict] || VERDICT_COPY.caution;
+  const info =
+    VERDICT_COPY[verdict] || VERDICT_COPY.caution;
 
   return (
     <div
@@ -335,6 +221,67 @@ function SectionHeading({ eyebrow, children }) {
   );
 }
 
+// ============================================================
+// HELPERS
+// ============================================================
+
+function normalizeVerdict(verdict, score) {
+  // The backend research score is the source of truth.
+  // 50 and above = Greenlit
+  // Below 50 = Failed
+  if (
+    typeof score === "number" &&
+    !Number.isNaN(score)
+  ) {
+    return score >= 50
+      ? "greenlight"
+      : "pass";
+  }
+
+  // Fallback only if no valid score is returned.
+  const value = String(verdict || "").toLowerCase();
+
+  if (
+    value === "greenlight" ||
+    value === "greenlit"
+  ) {
+    return "greenlight";
+  }
+
+  if (
+    value === "pass" ||
+    value === "failed"
+  ) {
+    return "pass";
+  }
+
+  return "caution";
+}
+
+function extractBudget(text) {
+  if (!text) return "Not specified";
+
+  const match = text.match(
+    /\$[\d,.]+\s?(?:M|B|K)?/i
+  );
+
+  return match ? match[0] : "Not specified";
+}
+
+function extractAudience(text) {
+  if (!text) return "Not specified";
+
+  const match = text.match(
+    /\d+\s*[–-]\s*\d+/
+  );
+
+  return match ? match[0] : "Not specified";
+}
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+
 export default function GreenlightReport() {
   const [pitch, setPitch] = useState(
     "A $30M sci-fi thriller targeted at 18–35 year olds, set aboard a research vessel that loses contact with Earth."
@@ -342,21 +289,16 @@ export default function GreenlightReport() {
 
   const [phase, setPhase] = useState("form");
   const [visibleSteps, setVisibleSteps] = useState(0);
-
-  // Real report returned by the backend
   const [reportData, setReportData] = useState(null);
-
-  // Error returned by the backend
   const [error, setError] = useState(null);
 
   const timers = useRef([]);
 
   // ============================================================
-  // CONNECT TO BACKEND
+  // RUN BACKEND RESEARCH
   // ============================================================
 
   const runResearch = async () => {
-    // Clear any previous timers
     timers.current.forEach(clearTimeout);
     timers.current = [];
 
@@ -365,25 +307,24 @@ export default function GreenlightReport() {
     setError(null);
     setReportData(null);
 
-    // ----------------------------------------------------------
-    // Animate the research steps while the backend is working
-    // ----------------------------------------------------------
-
+    // Animate research steps
     STEPS.forEach((_, i) => {
-      const t = setTimeout(() => {
+      const timer = setTimeout(() => {
         setVisibleSteps(i + 1);
       }, (i + 1) * 550);
 
-      timers.current.push(t);
+      timers.current.push(timer);
     });
 
     try {
-      console.log("[GREENLIGHT] Sending pitch to backend...");
-      console.log("[GREENLIGHT] Pitch:", pitch);
+      console.log(
+        "[GREENLIGHT] Sending pitch to backend..."
+      );
 
-      // --------------------------------------------------------
-      // Call FastAPI
-      // --------------------------------------------------------
+      console.log(
+        "[GREENLIGHT] Pitch:",
+        pitch
+      );
 
       const response = await fetch(
         "http://127.0.0.1:8000/api/greenlight",
@@ -403,12 +344,10 @@ export default function GreenlightReport() {
         response.status
       );
 
-      // --------------------------------------------------------
-      // Handle HTTP errors
-      // --------------------------------------------------------
-
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
+        const errorData = await response
+          .json()
+          .catch(() => null);
 
         throw new Error(
           errorData?.detail ||
@@ -416,24 +355,17 @@ export default function GreenlightReport() {
         );
       }
 
-      // --------------------------------------------------------
-      // Get JSON report from FastAPI
-      // --------------------------------------------------------
-
       const result = await response.json();
 
       console.log(
-        "[GREENLIGHT] Real backend report:",
+        "[GREENLIGHT] REAL BACKEND JSON:",
         result
       );
 
-      // --------------------------------------------------------
-      // Save real report
-      // --------------------------------------------------------
-
+      // IMPORTANT:
+      // Save the EXACT backend JSON.
       setReportData(result);
 
-      // Make all research steps appear complete
       setVisibleSteps(STEPS.length);
 
       // Show report
@@ -444,7 +376,6 @@ export default function GreenlightReport() {
         err
       );
 
-      // Stop the animation timers
       timers.current.forEach(clearTimeout);
       timers.current = [];
 
@@ -453,10 +384,13 @@ export default function GreenlightReport() {
           "Something went wrong while generating the report."
       );
 
-      // Return to form so user can try again
       setPhase("form");
     }
   };
+
+  // ============================================================
+  // RESET
+  // ============================================================
 
   const reset = () => {
     timers.current.forEach(clearTimeout);
@@ -468,17 +402,74 @@ export default function GreenlightReport() {
     setError(null);
   };
 
-  // ------------------------------------------------------------
-  // Use real backend data if available.
-  // Fixtures are only a fallback before a real report exists.
-  // ------------------------------------------------------------
+  // ============================================================
+  // DATA FROM BACKEND
+  // ============================================================
 
-  const data =
-    reportData || FIXTURES.greenlight;
+  const data = reportData
+    ? {
+        // SCORE NOW DETERMINES THE VERDICT
+        verdict: normalizeVerdict(
+          reportData.verdict,
+          reportData.score
+        ),
 
-  const verdict =
-    VERDICT_COPY[data.verdict] ||
+        score:
+          typeof reportData.score === "number"
+            ? reportData.score
+            : 0,
+
+        pitchSummary:
+          reportData.pitch_summary ||
+          pitch,
+
+        budget: extractBudget(
+          reportData.pitch_summary || pitch
+        ),
+
+        audience: extractAudience(
+          reportData.pitch_summary || pitch
+        ),
+
+        competitors:
+          Array.isArray(
+            reportData.competitors
+          )
+            ? reportData.competitors
+            : [],
+
+        audienceTrends:
+          reportData.audience_trends || {},
+
+        reviewSentiment:
+          reportData.review_sentiment || {},
+
+        marketGap:
+          reportData.market_gap || {},
+
+        risks:
+          Array.isArray(reportData.risks)
+            ? reportData.risks
+            : [],
+
+        recommendation:
+          reportData.recommendation ||
+          "No recommendation was returned.",
+
+        sources:
+          Array.isArray(reportData.sources)
+            ? reportData.sources
+            : [],
+      }
+    : null;
+
+  const verdictInfo =
+    VERDICT_COPY[data?.verdict] ||
     VERDICT_COPY.caution;
+
+  // ============================================================
+  // UI
+  // ============================================================
 
   return (
     <div
@@ -487,7 +478,8 @@ export default function GreenlightReport() {
         background:
           "radial-gradient(circle at 20% 10%, rgba(183,145,91,0.10), transparent 25%), #E8DDC8",
         color: "#382E27",
-        fontFamily: "'Trebuchet MS', Arial, sans-serif",
+        fontFamily:
+          "'Trebuchet MS', Arial, sans-serif",
         padding: "48px 20px 70px",
         boxSizing: "border-box",
         position: "relative",
@@ -496,7 +488,7 @@ export default function GreenlightReport() {
     >
       <FilmStrip position="top" />
 
-      {/* subtle paper texture */}
+      {/* Paper texture */}
       <div
         style={{
           position: "fixed",
@@ -511,7 +503,7 @@ export default function GreenlightReport() {
 
       <div
         style={{
-          maxWidth: 760,
+          maxWidth: 820,
           margin: "0 auto",
           position: "relative",
         }}
@@ -522,7 +514,6 @@ export default function GreenlightReport() {
 
         {phase === "form" && (
           <div>
-            {/* Masthead */}
             <div
               style={{
                 textAlign: "center",
@@ -556,6 +547,7 @@ export default function GreenlightReport() {
               >
                 Greenlight
                 <br />
+
                 <span
                   style={{
                     fontStyle: "italic",
@@ -581,12 +573,11 @@ export default function GreenlightReport() {
                 }}
               >
                 A little intelligence for deciding
-                which stories deserve their moment in the
-                spotlight.
+                which stories deserve their moment
+                in the spotlight.
               </p>
             </div>
 
-            {/* Main paper */}
             <div
               style={{
                 background: "#F5EBD8",
@@ -610,38 +601,39 @@ export default function GreenlightReport() {
                 }}
               />
 
-              <div style={{ position: "relative" }}>
-                <div
+              <div
+                style={{
+                  position: "relative",
+                }}
+              >
+                <label
+                  htmlFor="pitch"
                   style={{
-                    display: "flex",
-                    alignItems: "center",
+                    display: "block",
                     marginBottom: 12,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.18em",
+                    textTransform: "uppercase",
+                    color: "#80684D",
                   }}
                 >
-                  <label
-                    htmlFor="pitch"
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.18em",
-                      textTransform: "uppercase",
-                      color: "#80684D",
-                    }}
-                  >
-                    Prompt
-                  </label>
-                </div>
+                  Prompt
+                </label>
 
                 <textarea
                   id="pitch"
                   value={pitch}
-                  onChange={(e) => setPitch(e.target.value)}
+                  onChange={(e) =>
+                    setPitch(e.target.value)
+                  }
                   rows={5}
                   style={{
                     width: "100%",
                     boxSizing: "border-box",
                     background: "#FBF4E6",
-                    border: "1px solid #CBB99B",
+                    border:
+                      "1px solid #CBB99B",
                     borderRadius: 2,
                     color: "#40352B",
                     padding: "17px 18px",
@@ -656,47 +648,41 @@ export default function GreenlightReport() {
                   }}
                 />
 
-                <div
+                <button
+                  onClick={runResearch}
+                  disabled={!pitch.trim()}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
                     marginTop: 23,
+                    background: "#7E403A",
+                    color: "#FFF7E8",
+                    border: "none",
+                    borderRadius: 2,
+                    padding: "13px 24px",
+                    fontFamily:
+                      "Georgia, 'Times New Roman', serif",
+                    fontSize: 14,
+                    cursor: pitch.trim()
+                      ? "pointer"
+                      : "not-allowed",
+                    letterSpacing: "0.04em",
+                    boxShadow:
+                      "0 4px 10px rgba(91,49,44,0.18)",
+                    opacity: pitch.trim()
+                      ? 1
+                      : 0.6,
                   }}
                 >
-                  <button
-                    onClick={runResearch}
-                    disabled={!pitch.trim()}
-                    style={{
-                      background: "#7E403A",
-                      color: "#FFF7E8",
-                      border: "none",
-                      borderRadius: 2,
-                      padding: "13px 24px",
-                      fontFamily:
-                        "Georgia, 'Times New Roman', serif",
-                      fontSize: 14,
-                      cursor: pitch.trim()
-                        ? "pointer"
-                        : "not-allowed",
-                      letterSpacing: "0.04em",
-                      boxShadow:
-                        "0 4px 10px rgba(91,49,44,0.18)",
-                      opacity: pitch.trim() ? 1 : 0.6,
-                    }}
-                  >
-                    Begin the screening
-                  </button>
-                </div>
+                  Begin the screening
+                </button>
 
-                {/* Backend error */}
                 {error && (
                   <div
                     style={{
                       marginTop: 20,
                       padding: "13px 15px",
                       background: "#F3E0D7",
-                      border: "1px solid #C99B8D",
+                      border:
+                        "1px solid #C99B8D",
                       color: "#91483F",
                       fontFamily:
                         "Georgia, 'Times New Roman', serif",
@@ -704,24 +690,14 @@ export default function GreenlightReport() {
                       lineHeight: 1.5,
                     }}
                   >
-                    <strong>Screening failed:</strong>{" "}
+                    <strong>
+                      Screening failed:
+                    </strong>{" "}
                     {error}
                   </div>
                 )}
               </div>
             </div>
-
-            <p
-              style={{
-                textAlign: "center",
-                marginTop: 25,
-                fontFamily:
-                  "Georgia, 'Times New Roman', serif",
-                fontSize: 11,
-                color: "#9B8569",
-                fontStyle: "italic",
-              }}
-            ></p>
           </div>
         )}
 
@@ -766,7 +742,8 @@ export default function GreenlightReport() {
                   "Georgia, 'Times New Roman', serif",
                 fontStyle: "italic",
                 color: "#8B755C",
-                margin: "8px 0 30px",
+                margin:
+                  "8px 0 30px",
                 fontSize: 14,
               }}
             >
@@ -776,7 +753,8 @@ export default function GreenlightReport() {
             <div
               style={{
                 background: "#F5EBD8",
-                border: "1px solid #C9B99D",
+                border:
+                  "1px solid #C9B99D",
                 padding: "24px 30px",
                 textAlign: "left",
                 boxShadow:
@@ -791,10 +769,15 @@ export default function GreenlightReport() {
                     alignItems: "center",
                     gap: 13,
                     padding: "11px 0",
-                    opacity: i < visibleSteps ? 1 : 0.28,
-                    transition: "opacity 0.4s ease",
+                    opacity:
+                      i < visibleSteps
+                        ? 1
+                        : 0.28,
+                    transition:
+                      "opacity 0.4s ease",
                     borderBottom:
-                      i !== STEPS.length - 1
+                      i !==
+                      STEPS.length - 1
                         ? "1px dotted #C8B79A"
                         : "none",
                   }}
@@ -803,10 +786,12 @@ export default function GreenlightReport() {
                     style={{
                       width: 18,
                       height: 18,
-                      border: "1px solid #A88D69",
+                      border:
+                        "1px solid #A88D69",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
+                      justifyContent:
+                        "center",
                       fontSize: 9,
                       color:
                         i < visibleSteps
@@ -815,7 +800,9 @@ export default function GreenlightReport() {
                       flexShrink: 0,
                     }}
                   >
-                    {i < visibleSteps ? "✓" : "○"}
+                    {i < visibleSteps
+                      ? "✓"
+                      : "○"}
                   </span>
 
                   <span
@@ -832,14 +819,18 @@ export default function GreenlightReport() {
                     {step}
                   </span>
 
-                  {i < visibleSteps && (
+                  {i <
+                    visibleSteps && (
                     <span
                       style={{
-                        marginLeft: "auto",
+                        marginLeft:
+                          "auto",
                         fontSize: 9,
                         color: "#607A50",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.1em",
+                        textTransform:
+                          "uppercase",
+                        letterSpacing:
+                          "0.1em",
                       }}
                     >
                       done
@@ -855,576 +846,1084 @@ export default function GreenlightReport() {
             REPORT
         ==================================================== */}
 
-        {phase === "report" && (
-          <div>
-            {/* Report masthead */}
-            <div
-              style={{
-                textAlign: "center",
-                marginBottom: 28,
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 9,
-                  letterSpacing: "0.25em",
-                  textTransform: "uppercase",
-                  color: "#967A58",
-                  fontWeight: 700,
-                }}
-              >
-                Confidential · Studio Research Desk
-              </p>
-
-              <h1
-                style={{
-                  fontFamily:
-                    "Georgia, 'Times New Roman', serif",
-                  fontSize: 37,
-                  fontWeight: 500,
-                  margin: "8px 0 0",
-                  color: "#382E27",
-                }}
-              >
-                The Greenlight agent
-              </h1>
-
-              <p
-                style={{
-                  fontFamily:
-                    "Georgia, 'Times New Roman', serif",
-                  fontStyle: "italic",
-                  color: "#90775A",
-                  fontSize: 12,
-                  margin: "6px 0 0",
-                }}
-              >
-                Market intelligence
-              </p>
-            </div>
-
-            {/* Report paper */}
-            <div
-              style={{
-                background: "#F5EBD8",
-                border: "1px solid #C9B99D",
-                boxShadow:
-                  "0 15px 40px rgba(76,57,37,0.14)",
-                padding: "38px 42px 42px",
-                position: "relative",
-              }}
-            >
+        {phase === "report" &&
+          data && (
+            <div>
+              {/* Header */}
               <div
                 style={{
-                  position: "absolute",
-                  top: 13,
-                  left: 13,
-                  right: 13,
-                  bottom: 13,
-                  border:
-                    "1px solid rgba(158,127,87,0.22)",
-                  pointerEvents: "none",
+                  textAlign: "center",
+                  marginBottom: 28,
                 }}
-              />
-
-              <div style={{ position: "relative" }}>
-                {/* Verdict */}
-                <div
+              >
+                <p
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 25,
-                    paddingBottom: 25,
+                    margin: 0,
+                    fontSize: 9,
+                    letterSpacing:
+                      "0.25em",
+                    textTransform:
+                      "uppercase",
+                    color: "#967A58",
+                    fontWeight: 700,
                   }}
                 >
-                  <VerdictSeal verdict={data.verdict} />
+                  Confidential · Studio
+                  Research Desk
+                </p>
 
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 5px",
-                        fontSize: 9,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.2em",
-                        color: "#927653",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Final recommendation
-                    </p>
-
-                    <h2
-                      style={{
-                        fontFamily:
-                          "Georgia, 'Times New Roman', serif",
-                        fontSize: 30,
-                        fontWeight: 500,
-                        color: verdict.color,
-                        margin: 0,
-                      }}
-                    >
-                      {verdict.label}
-                    </h2>
-
-                    <p
-                      style={{
-                        margin: "7px 0 0",
-                        color: "#6F604F",
-                        fontFamily:
-                          "Georgia, 'Times New Roman', serif",
-                        fontSize: 14,
-                        lineHeight: 1.55,
-                        maxWidth: 450,
-                      }}
-                    >
-                      {data.rationale}
-                    </p>
-                  </div>
-                </div>
-
-                <OrnamentalDivider />
-
-                {/* Project information */}
-                <div
+                <h1
                   style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(130px, 1fr))",
-                    gap: 18,
-                    padding: "3px 0 10px",
+                    fontFamily:
+                      "Georgia, 'Times New Roman', serif",
+                    fontSize: 37,
+                    fontWeight: 500,
+                    margin:
+                      "8px 0 0",
+                    color: "#382E27",
                   }}
                 >
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 5px",
-                        fontSize: 8,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.16em",
-                        color: "#967A58",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Prompt
-                    </p>
+                  The Greenlight Agent
+                </h1>
 
-                    <p
-                      style={{
-                        margin: 0,
-                        fontFamily:
-                          "Georgia, 'Times New Roman', serif",
-                        fontSize: 15,
-                        color: "#40352B",
-                      }}
-                    >
-                      {data.project}
-                    </p>
-                  </div>
+                <p
+                  style={{
+                    fontFamily:
+                      "Georgia, 'Times New Roman', serif",
+                    fontStyle: "italic",
+                    color: "#90775A",
+                    fontSize: 12,
+                    margin:
+                      "6px 0 0",
+                  }}
+                >
+                  Market intelligence ·
+                  Agent-generated
+                </p>
+              </div>
 
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 5px",
-                        fontSize: 8,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.16em",
-                        color: "#967A58",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Opportunity
-                    </p>
+              {/* Paper */}
+              <div
+                style={{
+                  background: "#F5EBD8",
+                  border:
+                    "1px solid #C9B99D",
+                  boxShadow:
+                    "0 15px 40px rgba(76,57,37,0.14)",
+                  padding:
+                    "38px 42px 42px",
+                  position: "relative",
+                }}
+              >
+                <div
+                  style={{
+                    position:
+                      "absolute",
+                    top: 13,
+                    left: 13,
+                    right: 13,
+                    bottom: 13,
+                    border:
+                      "1px solid rgba(158,127,87,0.22)",
+                    pointerEvents:
+                      "none",
+                  }}
+                />
 
-                    <p
-                      style={{
-                        margin: 0,
-                        fontFamily:
-                          "Georgia, 'Times New Roman', serif",
-                        fontSize: 25,
-                        color: "#382E27",
-                      }}
-                    >
-                      {data.score}
-
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: "#927D63",
-                        }}
-                      >
-                        {" "}
-                        / 100
-                      </span>
-                    </p>
-                  </div>
-
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 5px",
-                        fontSize: 8,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.16em",
-                        color: "#967A58",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Confidence
-                    </p>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        fontFamily:
-                          "Georgia, 'Times New Roman', serif",
-                        fontSize: 15,
-                        color: "#40352B",
-                      }}
-                    >
-                      {data.confidence}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 5px",
-                        fontSize: 8,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.16em",
-                        color: "#967A58",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Audience
-                    </p>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        fontFamily:
-                          "Georgia, 'Times New Roman', serif",
-                        fontSize: 15,
-                        color: "#40352B",
-                      }}
-                    >
-                      {data.audience}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p
-                      style={{
-                        margin: "0 0 5px",
-                        fontSize: 8,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.16em",
-                        color: "#967A58",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Budget
-                    </p>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        fontFamily:
-                          "Georgia, 'Times New Roman', serif",
-                        fontSize: 15,
-                        color: "#40352B",
-                      }}
-                    >
-                      {data.budget}
-                    </p>
-                  </div>
-                </div>
-
-                <OrnamentalDivider />
-
-                {/* Competitors */}
-                <section style={{ padding: "3px 0" }}>
-                  <SectionHeading eyebrow="The competition">
-                    Major competitors
-                  </SectionHeading>
+                <div
+                  style={{
+                    position:
+                      "relative",
+                  }}
+                >
+                  {/* ==================================================
+                      VERDICT
+                  ================================================== */}
 
                   <div
                     style={{
-                      borderTop: "1px solid #BFAE91",
+                      display: "flex",
+                      alignItems:
+                        "center",
+                      gap: 25,
+                      paddingBottom: 25,
                     }}
                   >
-                    {data.competitors.map((c, i) => (
-                      <div
-                        key={c.title}
+                    <VerdictSeal
+                      verdict={
+                        data.verdict
+                      }
+                    />
+
+                    <div>
+                      <p
                         style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "35px 1fr auto",
-                          gap: 13,
-                          alignItems: "center",
-                          padding: "15px 4px",
-                          borderBottom:
-                            "1px dotted #C6B59A",
+                          margin:
+                            "0 0 5px",
+                          fontSize: 9,
+                          textTransform:
+                            "uppercase",
+                          letterSpacing:
+                            "0.2em",
+                          color: "#927653",
+                          fontWeight: 700,
                         }}
                       >
+                        Final recommendation
+                      </p>
+
+                      <h2
+                        style={{
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontSize: 30,
+                          fontWeight: 500,
+                          color:
+                            verdictInfo.color,
+                          margin: 0,
+                        }}
+                      >
+                        {
+                          verdictInfo.label
+                        }
+                      </h2>
+
+                      <p
+                        style={{
+                          margin:
+                            "7px 0 0",
+                          color: "#6F604F",
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontSize: 14,
+                          lineHeight: 1.55,
+                          maxWidth: 500,
+                        }}
+                      >
+                        {
+                          data.recommendation
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      PITCH SUMMARY
+                  ================================================== */}
+
+                  <section>
+                    <SectionHeading eyebrow="The project">
+                      Pitch summary
+                    </SectionHeading>
+
+                    <div
+                      style={{
+                        background:
+                          "#EFE3CF",
+                        border:
+                          "1px solid #C7B493",
+                        padding:
+                          "20px 22px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontSize: 16,
+                          lineHeight: 1.7,
+                          color:
+                            "#5D4E40",
+                        }}
+                      >
+                        {
+                          data.pitchSummary
+                        }
+                      </p>
+                    </div>
+                  </section>
+
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      SCORE / AUDIENCE / BUDGET
+                  ================================================== */}
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(150px, 1fr))",
+                      gap: 18,
+                    }}
+                  >
+                    <div
+                      style={{
+                        background:
+                          "#E8DDC8",
+                        border:
+                          "1px solid #C7B493",
+                        padding:
+                          "18px 20px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin:
+                            "0 0 6px",
+                          fontSize: 8,
+                          textTransform:
+                            "uppercase",
+                          letterSpacing:
+                            "0.16em",
+                          color:
+                            "#967A58",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Opportunity score
+                      </p>
+
+                      <p
+                        style={{
+                          margin: 0,
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontSize: 30,
+                          color:
+                            "#382E27",
+                        }}
+                      >
+                        {data.score}
                         <span
                           style={{
-                            fontFamily:
-                              "Georgia, 'Times New Roman', serif",
-                            fontSize: 13,
-                            color: "#A38A68",
+                            fontSize: 12,
+                            color:
+                              "#927D63",
                           }}
                         >
-                          0{i + 1}
+                          {" "}
+                          / 100
                         </span>
+                      </p>
+                    </div>
 
-                        <div>
-                          <p
+                    <div
+                      style={{
+                        background:
+                          "#E8DDC8",
+                        border:
+                          "1px solid #C7B493",
+                        padding:
+                          "18px 20px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin:
+                            "0 0 6px",
+                          fontSize: 8,
+                          textTransform:
+                            "uppercase",
+                          letterSpacing:
+                            "0.16em",
+                          color:
+                            "#967A58",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Target audience
+                      </p>
+
+                      <p
+                        style={{
+                          margin: 0,
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontSize: 18,
+                          color:
+                            "#382E27",
+                        }}
+                      >
+                        {
+                          data.audience
+                        }
+                      </p>
+                    </div>
+
+                    <div
+                      style={{
+                        background:
+                          "#E8DDC8",
+                        border:
+                          "1px solid #C7B493",
+                        padding:
+                          "18px 20px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin:
+                            "0 0 6px",
+                          fontSize: 8,
+                          textTransform:
+                            "uppercase",
+                          letterSpacing:
+                            "0.16em",
+                          color:
+                            "#967A58",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Budget
+                      </p>
+
+                      <p
+                        style={{
+                          margin: 0,
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontSize: 18,
+                          color:
+                            "#382E27",
+                        }}
+                      >
+                        {data.budget}
+                      </p>
+                    </div>
+                  </div>
+
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      COMPETITORS
+                  ================================================== */}
+
+                  <section>
+                    <SectionHeading eyebrow="The competition">
+                      Major competitors
+                    </SectionHeading>
+
+                    {data.competitors.length ===
+                    0 ? (
+                      <p
+                        style={{
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          color:
+                            "#806F5B",
+                          fontSize: 14,
+                        }}
+                      >
+                        No competitor
+                        data returned.
+                      </p>
+                    ) : (
+                      <div
+                        style={{
+                          borderTop:
+                            "1px solid #BFAE91",
+                        }}
+                      >
+                        {data.competitors.map(
+                          (film, index) => (
+                            <div
+                              key={
+                                film.title ||
+                                index
+                              }
+                              style={{
+                                padding:
+                                  "18px 4px",
+                                borderBottom:
+                                  "1px dotted #C6B59A",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display:
+                                    "flex",
+                                  justifyContent:
+                                    "space-between",
+                                  gap: 20,
+                                }}
+                              >
+                                <div>
+                                  <p
+                                    style={{
+                                      margin: 0,
+                                      fontFamily:
+                                        "Georgia, 'Times New Roman', serif",
+                                      fontSize: 18,
+                                      color:
+                                        "#40352B",
+                                    }}
+                                  >
+                                    {String(
+                                      index +
+                                        1
+                                    ).padStart(
+                                      2,
+                                      "0"
+                                    )}{" "}
+                                    ·{" "}
+                                    {
+                                      film.title
+                                    }
+                                  </p>
+
+                                  <p
+                                    style={{
+                                      margin:
+                                        "5px 0 0",
+                                      fontSize:
+                                        11,
+                                      color:
+                                        "#89745B",
+                                    }}
+                                  >
+                                    Released{" "}
+                                    {
+                                      film.release_year
+                                    }
+                                  </p>
+                                </div>
+
+                                <div
+                                  style={{
+                                    fontFamily:
+                                      "Georgia, 'Times New Roman', serif",
+                                    fontSize:
+                                      12,
+                                    color:
+                                      "#6E443D",
+                                    textAlign:
+                                      "right",
+                                    maxWidth:
+                                      250,
+                                  }}
+                                >
+                                  {
+                                    film.box_office
+                                  }
+                                </div>
+                              </div>
+
+                              <p
+                                style={{
+                                  margin:
+                                    "10px 0 0",
+                                  fontFamily:
+                                    "Georgia, 'Times New Roman', serif",
+                                  fontSize:
+                                    13,
+                                  lineHeight:
+                                    1.6,
+                                  color:
+                                    "#655747",
+                                }}
+                              >
+                                {
+                                  film.similarity_reason
+                                }
+                              </p>
+
+                              {film.source_url && (
+                                <a
+                                  href={
+                                    film.source_url
+                                  }
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    display:
+                                      "inline-block",
+                                    marginTop:
+                                      8,
+                                    fontSize:
+                                      10,
+                                    color:
+                                      "#7E403A",
+                                    textDecoration:
+                                      "none",
+                                  }}
+                                >
+                                  View source →
+                                </a>
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    )}
+                  </section>
+
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      AUDIENCE TRENDS
+                  ================================================== */}
+
+                  <section>
+                    <SectionHeading eyebrow="Audience intelligence">
+                      Audience trends
+                    </SectionHeading>
+
+                    {data.audienceTrends
+                      .summary && (
+                      <p
+                        style={{
+                          margin:
+                            "0 0 18px",
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontStyle:
+                            "italic",
+                          fontSize: 14,
+                          lineHeight:
+                            1.7,
+                          color:
+                            "#655747",
+                        }}
+                      >
+                        {
+                          data
+                            .audienceTrends
+                            .summary
+                        }
+                      </p>
+                    )}
+
+                    {Array.isArray(
+                      data.audienceTrends
+                        .supporting_points
+                    ) &&
+                      data.audienceTrends.supporting_points.map(
+                        (point, index) => (
+                          <div
+                            key={index}
                             style={{
-                              margin: 0,
-                              fontFamily:
-                                "Georgia, 'Times New Roman', serif",
-                              fontSize: 16,
-                              color: "#40352B",
+                              display:
+                                "flex",
+                              gap: 13,
+                              marginBottom:
+                                14,
                             }}
                           >
-                            {c.title}
-                          </p>
+                            <span
+                              style={{
+                                color:
+                                  "#9C7A4F",
+                                fontFamily:
+                                  "Georgia, 'Times New Roman', serif",
+                                fontSize:
+                                  15,
+                              }}
+                            >
+                              ✦
+                            </span>
 
+                            <p
+                              style={{
+                                margin: 0,
+                                fontFamily:
+                                  "Georgia, 'Times New Roman', serif",
+                                fontSize:
+                                  14,
+                                lineHeight:
+                                  1.65,
+                                color:
+                                  "#655747",
+                              }}
+                            >
+                              {point}
+                            </p>
+                          </div>
+                        )
+                      )}
+                  </section>
+
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      REVIEW SENTIMENT
+                  ================================================== */}
+
+                  <section
+                    style={{
+                      background:
+                        "#EFE3CF",
+                      border:
+                        "1px solid #C7B493",
+                      padding:
+                        "22px 24px",
+                    }}
+                  >
+                    <SectionHeading eyebrow="Critical reception">
+                      Review sentiment
+                    </SectionHeading>
+
+                    {data.reviewSentiment
+                      .sentiment_score && (
+                      <div
+                        style={{
+                          display:
+                            "inline-block",
+                          background:
+                            "#E8DDC8",
+                          border:
+                            "1px solid #BFAE91",
+                          padding:
+                            "8px 13px",
+                          marginBottom:
+                            15,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color:
+                            "#7E403A",
+                          letterSpacing:
+                            "0.05em",
+                        }}
+                      >
+                        {
+                          data
+                            .reviewSentiment
+                            .sentiment_score
+                        }
+                      </div>
+                    )}
+
+                    {data.reviewSentiment
+                      .summary && (
+                      <p
+                        style={{
+                          margin: 0,
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontSize: 14,
+                          lineHeight:
+                            1.7,
+                          color:
+                            "#5D4E40",
+                        }}
+                      >
+                        {
+                          data
+                            .reviewSentiment
+                            .summary
+                        }
+                      </p>
+                    )}
+                  </section>
+
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      MARKET GAP
+                  ================================================== */}
+
+                  <section
+                    style={{
+                      background:
+                        "#E8DDC8",
+                      border:
+                        "1px solid #C7B493",
+                      padding:
+                        "22px 24px",
+                    }}
+                  >
+                    <SectionHeading eyebrow="White space">
+                      The market gap
+                    </SectionHeading>
+
+                    <p
+                      style={{
+                        margin: 0,
+                        fontFamily:
+                          "Georgia, 'Times New Roman', serif",
+                        fontSize: 15,
+                        lineHeight:
+                          1.7,
+                        color:
+                          "#5D4E40",
+                      }}
+                    >
+                      {
+                        data.marketGap
+                          .gap
+                      }
+                    </p>
+
+                    {Array.isArray(
+                      data.marketGap
+                        .source_urls
+                    ) &&
+                      data.marketGap.source_urls
+                        .length > 0 && (
+                        <div
+                          style={{
+                            marginTop:
+                              15,
+                            paddingTop:
+                              12,
+                            borderTop:
+                              "1px dotted #BFAE91",
+                          }}
+                        >
                           <p
                             style={{
-                              margin: "3px 0 0",
-                              fontSize: 11,
-                              color: "#89745B",
+                              margin:
+                                "0 0 8px",
+                              fontSize:
+                                9,
+                              textTransform:
+                                "uppercase",
+                              letterSpacing:
+                                "0.15em",
+                              color:
+                                "#967A58",
+                              fontWeight:
+                                700,
                             }}
                           >
-                            {c.studio}, {c.year} · {c.note}
+                            Sources
                           </p>
+
+                          {data.marketGap.source_urls.map(
+                            (
+                              url,
+                              index
+                            ) => (
+                              <a
+                                key={
+                                  index
+                                }
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  display:
+                                    "block",
+                                  fontSize:
+                                    11,
+                                  color:
+                                    "#7E403A",
+                                  textDecoration:
+                                    "none",
+                                  marginBottom:
+                                    5,
+                                  wordBreak:
+                                    "break-all",
+                                }}
+                              >
+                                {url}
+                              </a>
+                            )
+                          )}
                         </div>
+                      )}
+                  </section>
 
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      RISKS
+                  ================================================== */}
+
+                  <section>
+                    <SectionHeading eyebrow="Proceed thoughtfully">
+                      Risks & watch-outs
+                    </SectionHeading>
+
+                    {data.risks.length ===
+                    0 ? (
+                      <p
+                        style={{
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          color:
+                            "#806F5B",
+                          fontSize: 14,
+                        }}
+                      >
+                        No specific risks
+                        were returned.
+                      </p>
+                    ) : (
+                      data.risks.map(
+                        (risk, index) => (
+                          <div
+                            key={index}
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "flex-start",
+                              marginBottom:
+                                14,
+                              paddingBottom:
+                                14,
+                              borderBottom:
+                                index !==
+                                data.risks
+                                  .length -
+                                  1
+                                  ? "1px dotted #C9B99D"
+                                  : "none",
+                            }}
+                          >
+                            <RiskDot
+                              severity={
+                                risk.severity
+                              }
+                            />
+
+                            <div
+                              style={{
+                                flex: 1,
+                              }}
+                            >
+                              <p
+                                style={{
+                                  fontFamily:
+                                    "Georgia, 'Times New Roman', serif",
+                                  fontSize:
+                                    14,
+                                  color:
+                                    "#655747",
+                                  margin: 0,
+                                  lineHeight:
+                                    1.55,
+                                  fontWeight:
+                                    600,
+                                }}
+                              >
+                                {
+                                  risk.risk
+                                }
+                              </p>
+
+                              <p
+                                style={{
+                                  margin:
+                                    "5px 0 0",
+                                  fontFamily:
+                                    "Georgia, 'Times New Roman', serif",
+                                  fontSize:
+                                    12,
+                                  lineHeight:
+                                    1.5,
+                                  color:
+                                    "#806F5B",
+                                }}
+                              >
+                                {
+                                  risk.reasoning
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      )
+                    )}
+                  </section>
+
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      RECOMMENDATION
+                  ================================================== */}
+
+                  <section>
+                    <SectionHeading eyebrow="The studio's call">
+                      Final recommendation
+                    </SectionHeading>
+
+                    <div
+                      style={{
+                        background:
+                          "#EFE3CF",
+                        border:
+                          "1px solid #C7B493",
+                        padding:
+                          "22px 24px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontFamily:
+                            "Georgia, 'Times New Roman', serif",
+                          fontSize: 15,
+                          lineHeight:
+                            1.75,
+                          color:
+                            "#5D4E40",
+                        }}
+                      >
+                        {
+                          data.recommendation
+                        }
+                      </p>
+                    </div>
+                  </section>
+
+                  <OrnamentalDivider />
+
+                  {/* ==================================================
+                      ALL SOURCES
+                  ================================================== */}
+
+                  <section>
+                    <SectionHeading eyebrow="Research trail">
+                      Sources
+                    </SectionHeading>
+
+                    <div
+                      style={{
+                        background:
+                          "#EFE3CF",
+                        border:
+                          "1px solid #C7B493",
+                        padding:
+                          "18px 20px",
+                        maxHeight: 280,
+                        overflowY:
+                          "auto",
+                      }}
+                    >
+                      {data.sources
+                        .length ===
+                      0 ? (
                         <p
                           style={{
                             margin: 0,
                             fontFamily:
                               "Georgia, 'Times New Roman', serif",
-                            fontSize: 15,
-                            color: "#6E443D",
-                            whiteSpace: "nowrap",
+                            fontSize:
+                              13,
+                            color:
+                              "#806F5B",
                           }}
                         >
-                          {c.boxOffice}
+                          No sources
+                          returned.
                         </p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <OrnamentalDivider />
-
-                {/* Trends */}
-                <section>
-                  <SectionHeading eyebrow="The word on the street">
-                    Observed trends
-                  </SectionHeading>
-
-                  {data.trends.map((t, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex",
-                        gap: 13,
-                        marginBottom: 14,
-                      }}
-                    >
-                      <span
-                        style={{
-                          color: "#9C7A4F",
-                          fontFamily:
-                            "Georgia, 'Times New Roman', serif",
-                          fontSize: 15,
-                        }}
-                      >
-                        ✦
-                      </span>
-
-                      <p
-                        style={{
-                          margin: 0,
-                          fontFamily:
-                            "Georgia, 'Times New Roman', serif",
-                          fontSize: 14,
-                          lineHeight: 1.65,
-                          color: "#655747",
-                        }}
-                      >
-                        {t}
-                      </p>
+                      ) : (
+                        data.sources.map(
+                          (
+                            source,
+                            index
+                          ) => (
+                            <a
+                              key={index}
+                              href={
+                                source
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display:
+                                  "block",
+                                fontSize:
+                                  11,
+                                lineHeight:
+                                  1.5,
+                                color:
+                                  "#7E403A",
+                                textDecoration:
+                                  "none",
+                                marginBottom:
+                                  8,
+                                wordBreak:
+                                  "break-all",
+                              }}
+                            >
+                              {index + 1}.{" "}
+                              {source}
+                            </a>
+                          )
+                        )
+                      )}
                     </div>
-                  ))}
-                </section>
+                  </section>
 
-                <OrnamentalDivider />
-
-                {/* Market gap */}
-                <section
-                  style={{
-                    background: "#E8DDC8",
-                    border: "1px solid #C7B493",
-                    padding: "22px 24px",
-                    position: "relative",
-                  }}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: -11,
-                      left: 22,
-                      background: "#F5EBD8",
-                      padding: "0 9px",
-                      color: "#967A58",
-                      fontSize: 10,
-                    }}
-                  >
-                    ✦
-                  </span>
-
-                  <SectionHeading eyebrow="White space">
-                    The market gap
-                  </SectionHeading>
-
-                  <p
-                    style={{
-                      margin: 0,
-                      fontFamily:
-                        "Georgia, 'Times New Roman', serif",
-                      fontSize: 15,
-                      lineHeight: 1.7,
-                      color: "#5D4E40",
-                    }}
-                  >
-                    {data.marketGap}
-                  </p>
-                </section>
-
-                <OrnamentalDivider />
-
-                {/* Risks */}
-                <section>
-                  <SectionHeading eyebrow="Proceed thoughtfully">
-                    Risks & watch-outs
-                  </SectionHeading>
-
-                  {data.risks.map((r, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        marginBottom: 12,
-                        paddingBottom: 12,
-                        borderBottom:
-                          i !== data.risks.length - 1
-                            ? "1px dotted #C9B99D"
-                            : "none",
-                      }}
-                    >
-                      <RiskDot severity={r.severity} />
-
-                      <p
-                        style={{
-                          fontFamily:
-                            "Georgia, 'Times New Roman', serif",
-                          fontSize: 14,
-                          color: "#655747",
-                          margin: 0,
-                          lineHeight: 1.55,
-                        }}
-                      >
-                        {r.text}
-                      </p>
-
-                      <span
-                        style={{
-                          marginLeft: "auto",
-                          paddingLeft: 12,
-                          fontSize: 8,
-                          letterSpacing: "0.1em",
-                          textTransform: "uppercase",
-                          color:
-                            r.severity === "red"
-                              ? "#91483F"
-                              : "#B58A45",
-                        }}
-                      >
-                        {r.severity}
-                      </span>
-                    </div>
-                  ))}
-                </section>
-
-                {/* Footer */}
-                <div
-                  style={{
-                    marginTop: 30,
-                    paddingTop: 20,
-                    borderTop: "1px solid #BFAE91",
-                    textAlign: "center",
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontFamily:
-                        "Georgia, 'Times New Roman', serif",
-                      fontSize: 11,
-                      color: "#927A5D",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    End of report ·
-                  </p>
-
+                  {/* Footer */}
                   <div
                     style={{
-                      marginTop: 10,
-                      fontSize: 12,
-                      color: "#A48A67",
-                      letterSpacing: "0.2em",
+                      marginTop: 30,
+                      paddingTop: 20,
+                      borderTop:
+                        "1px solid #BFAE91",
+                      textAlign:
+                        "center",
                     }}
                   >
-                    ✦ · ✦ · ✦
+                    <p
+                      style={{
+                        margin: 0,
+                        fontFamily:
+                          "Georgia, 'Times New Roman', serif",
+                        fontSize: 11,
+                        color:
+                          "#927A5D",
+                        fontStyle:
+                          "italic",
+                      }}
+                    >
+                      End of report ·
+                      Agent-generated
+                    </p>
+
+                    <div
+                      style={{
+                        marginTop: 10,
+                        fontSize: 12,
+                        color:
+                          "#A48A67",
+                        letterSpacing:
+                          "0.2em",
+                      }}
+                    >
+                      ✦ · ✦ · ✦
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Bottom action */}
-            <div
-              style={{
-                textAlign: "center",
-                marginTop: 25,
-              }}
-            >
-              <button
-                onClick={reset}
+              {/* Bottom action */}
+              <div
                 style={{
-                  background: "transparent",
-                  border: "1px solid #A99376",
-                  color: "#705D48",
-                  padding: "10px 20px",
-                  fontFamily:
-                    "Georgia, 'Times New Roman', serif",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  letterSpacing: "0.04em",
+                  textAlign: "center",
+                  marginTop: 25,
                 }}
               >
-                ↩ Review another picture
-              </button>
+                <button
+                  onClick={reset}
+                  style={{
+                    background:
+                      "transparent",
+                    border:
+                      "1px solid #A99376",
+                    color: "#705D48",
+                    padding:
+                      "10px 20px",
+                    fontFamily:
+                      "Georgia, 'Times New Roman', serif",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    letterSpacing:
+                      "0.04em",
+                  }}
+                >
+                  ↩ Review another picture
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
     </div>
   );

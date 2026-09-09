@@ -1,188 +1,176 @@
 import os
-from pathlib import Path
-
 from dotenv import load_dotenv
 
-# ---------------------------------------------------------
-# Load environment variables
-# ---------------------------------------------------------
-
-env_path = Path(__file__).resolve().parents[4] / ".env"
-load_dotenv(env_path)
-
-print(f"[PARALLEL] .env path: {env_path}")
-
-
-# ---------------------------------------------------------
-# Imports
-# ---------------------------------------------------------
+# 1. Load environment variables before initializing API clients
+load_dotenv()
 
 from google.adk.agents import Agent
 from google.adk.apps import App
 from parallel import Parallel
 
+# 2. Initialize Parallel client using environment key
+parallel_client = Parallel(api_key=os.environ.get("PARALLEL_API_KEY"))
 
-# ---------------------------------------------------------
-# Initialize Parallel client
-# ---------------------------------------------------------
-
-parallel_api_key = os.environ.get("PARALLEL_API_KEY")
-
-print(
-    f"[PARALLEL] API key found: "
-    f"{bool(parallel_api_key)}"
-)
-
-if not parallel_api_key:
-    print(
-        "[PARALLEL WARNING] PARALLEL_API_KEY is not set."
-    )
-
-parallel_client = Parallel(
-    api_key=parallel_api_key
-)
-
-
-# ---------------------------------------------------------
-# Competing films search tool
-# ---------------------------------------------------------
 
 def find_competing_films(query: str) -> str:
-    """
-    Finds competing films, box office trends, and market
-    context for a given genre or movie pitch.
+    """Finds competing films, box office trends, and market context for a given genre or movie pitch.
 
     Args:
         query: The search query string for movie competitors.
-
-    Returns:
-        Search results as a string.
     """
-
-    print("\n" + "=" * 60)
-    print("[SEARCH TOOL] find_competing_films called")
-    print(f"[SEARCH TOOL] Query: {query}")
-    print(
-        "[SEARCH TOOL] API key available: "
-        f"{bool(os.environ.get('PARALLEL_API_KEY'))}"
-    )
-    print("=" * 60)
-
     try:
-
-        # Make sure the API key exists before attempting search
-        if not os.environ.get("PARALLEL_API_KEY"):
-            error_message = (
-                "PARALLEL_API_KEY is not configured."
-            )
-
-            print(
-                f"[SEARCH TOOL ERROR] {error_message}"
-            )
-
-            return (
-                "Error executing search tool: "
-                f"{error_message}"
-            )
-
-        # -------------------------------------------------
-        # Call Parallel
-        # -------------------------------------------------
-
-        print("[SEARCH TOOL] Calling Parallel search...")
-
         results = parallel_client.search(
-            objective=(
-                f"Find competing films for: {query}"
-            ),
-            search_queries=[query],
+            objective=f"Find competing films for: {query}",
+            search_queries=[query]
         )
-
-        # -------------------------------------------------
-        # Successful search
-        # -------------------------------------------------
-
-        print(
-            "[SEARCH TOOL] Parallel search "
-            "completed successfully"
-        )
-
-        print(
-            f"[SEARCH TOOL] Result type: "
-            f"{type(results).__name__}"
-        )
-
-        print(
-            f"[SEARCH TOOL] Result preview: "
-            f"{str(results)[:500]}"
-        )
-
         return str(results)
-
     except Exception as e:
+        return f"Error executing search tool: {str(e)}"
 
-        # -------------------------------------------------
-        # Detailed error information
-        # -------------------------------------------------
+def audience_trends_search(query: str) -> str:
+    """Searches for demographic interest, audience sentiment, and viewing trends for a specific genre or theme.
 
-        print("\n" + "!" * 60)
-        print("[SEARCH TOOL ERROR]")
-        print(
-            f"[SEARCH TOOL ERROR] "
-            f"Exception type: {type(e).__name__}"
+    Args:
+        query: The genre, theme, or topic query to analyze audience interest for.
+    """
+    try:
+        results = parallel_client.search(
+            objective=f"Analyze audience trends, demographics, and social sentiment for: {query}",
+            search_queries=[query]
         )
-        print(
-            f"[SEARCH TOOL ERROR] "
-            f"Exception message: {str(e)}"
+        return str(results)
+    except Exception as e:
+        return f"Error executing audience trends search tool: {str(e)}"
+
+
+def review_sentiment_search(query: str) -> str:
+    """Searches critical review aggregations, audience reception scores, and common praise or complaints for a movie or subgenre.
+
+    Args:
+        query: The movie title or subgenre query to analyze critical reception and sentiment for.
+    """
+    try:
+        results = parallel_client.search(
+            objective=f"Gather critical review sentiment, score summaries, and audience reception for: {query}",
+            search_queries=[query]
         )
-        print(
-            f"[SEARCH TOOL ERROR] "
-            f"Exception repr: {repr(e)}"
+        return str(results)
+    except Exception as e:
+        return f"Error executing review sentiment tool: {str(e)}"
+
+
+def market_gap_search(query: str) -> str:
+    """Identifies underserviced market niches, missing themes, or unexploited opportunities in a film genre or market.
+
+    Args:
+        query: The film genre or subject area to discover market gaps and opportunities for.
+    """
+    try:
+        results = parallel_client.search(
+            objective=f"Identify market gaps, unfulfilled audience demand, and industry opportunities in: {query}",
+            search_queries=[query]
         )
-        print("!" * 60 + "\n")
+        return str(results)
+    except Exception as e:
+        return f"Error executing market gap search tool: {str(e)}"
 
-        return (
-            "Error executing search tool: "
-            f"{type(e).__name__}: {str(e)}"
+
+def box_office_search(query: str) -> str:
+    """Retrieves financial figures, budget allocations, production costs, and box office revenue data for films.
+
+    Args:
+        query: The film title or genre to lookup box office returns and budget metrics for.
+    """
+    try:
+        results = parallel_client.search(
+            objective=f"Retrieve exact box office revenue, budget figures, and financial returns for: {query}",
+            search_queries=[query]
         )
+        return str(results)
+    except Exception as e:
+        return f"Error executing box office search tool: {str(e)}"
 
 
-# ---------------------------------------------------------
-# Root agent
-# ---------------------------------------------------------
-
+# 3. Define root agent setup with string model identifier
 root_agent = Agent(
-    name="root_agent",
+        name="root_agent",
+        model="gemini-2.5-flash",
+        instruction="""
+    You are a film market research assistant analyzing a movie pitch. You have access
+    to 5 research tools: find_competing_films, box_office_search, review_sentiment_search, 
+    market_gap_search, and audience_trends_search.
 
-    model="gemini-2.5-flash",
+    You MUST call ALL FIVE tools below, in this exact order, before writing your final answer.
+    Do NOT skip any tool, even if you believe you already have enough information from an 
+    earlier tool call. Do NOT answer from your own knowledge — every fact must come from a 
+    tool call.
 
-    instruction="""
-You are a film market research assistant.
+    Required tool call sequence:
+    1. find_competing_films — to find comparable films
+    2. box_office_search — to find budget and box office figures for comparable films
+    3. audience_trends_search — to find relevant audience/demographic data
+    4. review_sentiment_search — to find critical reception patterns
+    5. market_gap_search — to find market gaps or opportunities
 
-When asked about competing films, box office trends,
-or similar topics, you MUST use the
-find_competing_films tool to get real search results.
+    You may call a tool more than once with a more specific query (e.g. calling 
+    review_sentiment_search again for a specific competitor by name) if it improves the 
+    quality and grounding of your answer. Only after all five required tool areas have 
+    returned results should you write the final answer.
 
-Do NOT answer from your own knowledge.
+    Once you have all search results, combine them into ONE final structured report.
 
-Always use the tool first.
+    RULES:
+    - Only include information the search results actually support — do not invent details.
+    - Skip generic "best of" list articles that don't give substantive comparable data.
+    - Prefer drawing information from DIFFERENT source URLs when multiple equally relevant options exist.
+    - Any fact and its source_url must come from the SAME source article — never mix facts
+      about one film with a source that discusses a different film.
+    - The "sources" list must contain ONLY URLs that appeared in the actual tool responses 
+      returned to you during this conversation. Never add a URL you did not receive from a 
+      tool call, even if it seems relevant, plausible, or likely correct.
+    - For "risks": derive each risk directly from patterns in the competitors, audience_trends, 
+      review_sentiment, and market_gap data gathered above — not from general genre knowledge. 
+      Each risk's "reasoning" must reference a specific finding (e.g. a named competitor's 
+      underperformance, a stated trend, a specific gap or lack of gap).
+    - The final recommendation must cite at least one specific competitor and one specific risk.
+    - Output ONLY valid JSON, no other text, in this format:
 
-If the user asks about movie competition,
-respond using the data returned by the search tool.
-
-If the search tool fails, clearly explain that
-the search tool encountered an error.
-""",
-
-    tools=[
-        find_competing_films,
-    ],
+    {
+      "pitch_summary": "",
+      "verdict": "GREENLIGHT | PASS",
+      "score": 0,
+      "competitors": [
+        { "title": "", "release_year": null, "similarity_reason": "", "box_office": "", "source_url": "" }
+      ],
+      "audience_trends": {
+        "summary": "",
+        "supporting_points": ["", ""],
+        "source_urls": [""]
+      },
+      "review_sentiment": {
+        "summary": "",
+        "sentiment_score": "",
+        "source_urls": [""]
+      },
+      "market_gap": {
+        "gap": "",
+        "source_urls": [""]
+      },
+      "risks": [
+        { "risk": "", "reasoning": "" }
+      ],
+      "recommendation": "",
+      "sources": [""]
+    }
+    """,
+        tools=[
+            find_competing_films,
+            box_office_search,
+            review_sentiment_search,
+            market_gap_search,
+            audience_trends_search,
+        ],
 )
-
-
-# ---------------------------------------------------------
-# ADK App
-# ---------------------------------------------------------
 
 app = App(
     root_agent=root_agent,

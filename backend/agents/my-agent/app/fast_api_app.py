@@ -1,17 +1,3 @@
-# Copyright 2026 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import contextlib
 import json
 import os
@@ -25,9 +11,12 @@ from google.auth.transport.requests import Request
 from a2a.server.tasks import InMemoryTaskStore
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from google.adk.cli.fast_api import get_fast_api_app
+from fastapi.middleware.cors import CORSMiddleware
 from google.adk.runners import Runner
 from pydantic import BaseModel
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 
 from app.app_utils import services
 from app.app_utils.a2a import attach_a2a_routes
@@ -39,20 +28,50 @@ from app.app_utils.a2a import attach_a2a_routes
 
 load_dotenv()
 
-otel_to_cloud = os.environ.get(
-    "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY",
-    "",
-).lower() in ("true", "1")
-
-allow_origins = (
-    os.getenv("ALLOW_ORIGINS", "").split(",")
-    if os.getenv("ALLOW_ORIGINS")
-    else None
+otel_to_cloud = (
+    os.environ.get(
+        "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY",
+        "",
+    ).lower()
+    in ("true", "1")
 )
 
 
 # ============================================================
-# DEPLOYED AGENT ENGINE
+# CORS
+# ============================================================
+
+# Always allow all three local frontend ports.
+# This means the frontend can run on 5173, 5174, or 5175.
+
+default_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+]
+
+# Also allow anything specified in .env
+env_origins = os.getenv("ALLOW_ORIGINS", "").split(",")
+
+allow_origins = default_origins.copy()
+
+for origin in env_origins:
+    origin = origin.strip()
+
+    if origin and origin not in allow_origins:
+        allow_origins.append(origin)
+
+
+print("[CORS] Allowed origins:")
+for origin in allow_origins:
+    print("   ", origin)
+
+
+# ============================================================
+# AGENT ENGINE
 # ============================================================
 
 AGENT_ENGINE_URL = (
@@ -63,25 +82,28 @@ AGENT_ENGINE_URL = (
 )
 
 
-# Directory containing the agent
+# ============================================================
+# AGENT DIRECTORY
+# ============================================================
+
 AGENT_DIR = os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
 )
 
 
 # ============================================================
-# APPLICATION LIFESPAN
+# LIFESPAN
 # ============================================================
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """
-    Set up the ADK runner and A2A routes when the FastAPI
-    application starts.
-    """
+
+    print("[LIFESPAN] Starting application...")
 
     from app.agent import app as adk_app
     from app.agent import root_agent
+
+    print("[LIFESPAN] Creating Runner...")
 
     runner = Runner(
         app=adk_app,
@@ -93,6 +115,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.runner = runner
     app.state.agent_app_name = adk_app.name
 
+    print("[LIFESPAN] Attaching A2A routes...")
+
     await attach_a2a_routes(
         app,
         agent=root_agent,
@@ -101,47 +125,209 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         rpc_path=f"/a2a/{adk_app.name}",
     )
 
+    print("[LIFESPAN] Application ready.")
+
     yield
 
 
-# ============================================================
-# FASTAPI APPLICATION
-# ============================================================
 
-app: FastAPI = get_fast_api_app(
-    agents_dir=AGENT_DIR,
-    web=True,
-    artifact_service_uri=services.ARTIFACT_SERVICE_URI,
-    allow_origins=allow_origins,
-    session_service_uri=services.SESSION_SERVICE_URI,
-    otel_to_cloud=otel_to_cloud,
+app = FastAPI(
+    title="Agentic Cinema API",
+    description="AI Film Research Agent API",
     lifespan=lifespan,
 )
 
-app.title = "my-agent"
-app.description = "API for interacting with the Agent my-agent"
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-# ============================================================
-# GREENLIGHT API
-# ============================================================
+
+
+class DebugMiddleware(BaseHTTPMiddleware):
+
+    async def dispatch(
+        self,
+        request: StarletteRequest,
+        call_next,
+    ):
+        print(
+            f"[DEBUG REQUEST] "
+            f"{request.method} "
+            f"{request.url.path}"
+        )
+
+        print(
+            "[DEBUG REQUEST HEADERS]",
+            dict(request.headers),
+        )
+
+        response = await call_next(request)
+
+        print(
+            f"[DEBUG RESPONSE] "
+            f"{request.method} "
+            f"{request.url.path} "
+            f"-> {response.status_code}"
+        )
+
+        return response
+
+
+app.add_middleware(DebugMiddleware)
+
+
+
+
+@app.get("/")
+async def root():
+    return {
+        "status": "ok",
+        "message": "Agentic Cinema backend is running",
+    }
+
+
+
+
+@app.get("/health")
+async def health():
+    return {
+        "status": "healthy",
+    }
+
+
 
 class GreenlightRequest(BaseModel):
     prompt: str
 
 
+
+
+def extract_text_from_event(event):
+
+    if not isinstance(event, dict):
+        return None
+
+    content = event.get("content")
+
+    if not isinstance(content, dict):
+        return None
+
+    parts = content.get("parts", [])
+
+    if not isinstance(parts, list):
+        return None
+
+    text_parts = []
+
+    for part in parts:
+
+        if not isinstance(part, dict):
+            continue
+
+        # Ignore tool calls
+        if "function_call" in part:
+            continue
+
+        # Ignore tool responses
+        if "function_response" in part:
+            continue
+
+        text = part.get("text")
+
+        if isinstance(text, str) and text.strip():
+            text_parts.append(text.strip())
+
+    if text_parts:
+        return "\n".join(text_parts)
+
+    return None
+
+
+
+def extract_final_agent_text(response_text: str):
+
+    events = []
+
+
+    for raw_line in response_text.splitlines():
+
+        line = raw_line.strip()
+
+        if not line:
+            continue
+
+        # Remove SSE prefix
+        if line.startswith("data:"):
+            line = line[len("data:"):].strip()
+
+        # Ignore SSE terminator
+        if line == "[DONE]":
+            continue
+
+        try:
+
+            event = json.loads(line)
+            events.append(event)
+
+        except json.JSONDecodeError:
+            continue
+
+
+    final_text = None
+
+    for event in events:
+
+        text = extract_text_from_event(event)
+
+        if text:
+            final_text = text
+
+
+    if not final_text:
+
+        try:
+
+            event = json.loads(
+                response_text.strip()
+            )
+
+            final_text = extract_text_from_event(
+                event
+            )
+
+        except json.JSONDecodeError:
+            pass
+
+    return final_text
+
+
+
 @app.post("/api/greenlight")
 async def greenlight(request: GreenlightRequest):
-    """
-    Receive a movie pitch from the React frontend,
-    call the deployed Google Agent Engine,
-    and return the final structured Greenlight report.
-    """
+
+    print("")
+    print("=" * 60)
+    print("[GREENLIGHT] Endpoint hit!")
+    print("=" * 60)
+
+    print(
+        "[GREENLIGHT] Prompt:",
+        request.prompt,
+    )
 
     try:
-        # ----------------------------------------------------
-        # 1. Get Google Application Default Credentials
-        # ----------------------------------------------------
+
+       
+
+        print(
+            "[GOOGLE AUTH] Getting credentials..."
+        )
 
         credentials, project_id = google.auth.default(
             scopes=[
@@ -149,26 +335,37 @@ async def greenlight(request: GreenlightRequest):
             ]
         )
 
-        # ----------------------------------------------------
-        # 2. Refresh credentials
-        # ----------------------------------------------------
+        print(
+            f"[GOOGLE AUTH] Project: {project_id}"
+        )
+
+        print(
+            "[GOOGLE AUTH] Refreshing credentials..."
+        )
 
         credentials.refresh(Request())
 
         if not credentials.token:
+
             raise RuntimeError(
-                "Google authentication succeeded but no access "
-                "token was obtained."
+                "Google credentials were obtained, "
+                "but no access token was available."
             )
 
-        # ----------------------------------------------------
-        # 3. Prepare Agent Engine request
-        # ----------------------------------------------------
+        print(
+            "[GOOGLE AUTH] Token obtained successfully"
+        )
+
+    
 
         headers = {
-            "Authorization": f"Bearer {credentials.token}",
+            "Authorization": (
+                f"Bearer {credentials.token}"
+            ),
             "Content-Type": "application/json",
         }
+
+    
 
         payload = {
             "class_method": "async_stream_query",
@@ -178,109 +375,107 @@ async def greenlight(request: GreenlightRequest):
             },
         }
 
-        # ----------------------------------------------------
-        # 4. Call deployed Agent Engine
-        # ----------------------------------------------------
 
-        print("[GREENLIGHT] Calling Agent Engine...")
+        print("")
+        print(
+            "[AGENT ENGINE] Calling Agent Engine..."
+        )
 
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        print(
+            "[AGENT ENGINE] URL:"
+        )
+
+        print(AGENT_ENGINE_URL)
+
+        async with httpx.AsyncClient(
+            timeout=300.0
+        ) as client:
+
             response = await client.post(
                 AGENT_ENGINE_URL,
                 headers=headers,
                 json=payload,
             )
 
-        # ----------------------------------------------------
-        # 5. Check response
-        # ----------------------------------------------------
+     
 
+        print("")
         print(
-            f"[AGENT ENGINE STATUS] {response.status_code}"
+            "[AGENT ENGINE STATUS]",
+            response.status_code,
         )
 
+       
+
         if response.status_code != 200:
+
+            print("")
+            print(
+                "[AGENT ENGINE ERROR]"
+            )
+
+            print(
+                response.text[:5000]
+            )
+
             raise RuntimeError(
-                f"Agent Engine returned HTTP "
+                "Agent Engine returned HTTP "
                 f"{response.status_code}: "
                 f"{response.text[:1000]}"
             )
 
-        # ----------------------------------------------------
-        # TEMPORARY DEBUG
-        # ----------------------------------------------------
-        # Print the returned SSE response so we can inspect
-        # its structure. This does NOT print our Authorization
-        # header or Google credentials.
-        # ----------------------------------------------------
+    
 
-        print("[AGENT ENGINE RESPONSE PREVIEW]")
-        print(response.text[:10000])
-        print("[END RESPONSE PREVIEW]")
+        print("")
+        print(
+            "[AGENT ENGINE RESPONSE PREVIEW]"
+        )
 
-        # ----------------------------------------------------
-        # 6. Parse Server-Sent Events
-        # ----------------------------------------------------
+        print(
+            response.text[:10000]
+        )
 
-        final_text = None
+        print(
+            "[END RESPONSE PREVIEW]"
+        )
 
-        for line in response.text.splitlines():
 
-            line = line.strip()
+        print("")
+        print(
+            "[PARSER] Looking for final agent response..."
+        )
 
-            if not line.startswith("data:"):
-                continue
+        final_text = extract_final_agent_text(
+            response.text
+        )
 
-            data = line[len("data:"):].strip()
-
-            if not data:
-                continue
-
-            try:
-                event = json.loads(data)
-
-            except json.JSONDecodeError:
-                continue
-
-            # ------------------------------------------------
-            # Look for content.parts[].text
-            # ------------------------------------------------
-
-            content = event.get("content", {})
-
-            if not isinstance(content, dict):
-                continue
-
-            parts = content.get("parts", [])
-
-            if not isinstance(parts, list):
-                continue
-
-            for part in parts:
-
-                if not isinstance(part, dict):
-                    continue
-
-                text = part.get("text")
-
-                if text:
-                    final_text = text
-
-        # ----------------------------------------------------
-        # 7. Make sure we received a final response
-        # ----------------------------------------------------
+      
 
         if not final_text:
-            raise RuntimeError(
-                "Agent Engine returned successfully, but no final "
-                "agent response was found in the stream."
+
+            print("")
+            print(
+                "[PARSER] No final text found."
             )
 
-        # ----------------------------------------------------
-        # 8. Remove Markdown JSON fences
-        # ----------------------------------------------------
+            print(
+                "[PARSER] Raw response:"
+            )
 
+            print(
+                response.text[:20000]
+            )
+
+            raise RuntimeError(
+                "Agent Engine returned successfully, "
+                "but no final textual agent response "
+                "was found."
+            )
+
+    
         final_text = final_text.strip()
+
+        # Remove markdown JSON fences
 
         final_text = re.sub(
             r"^```json\s*",
@@ -297,36 +492,92 @@ async def greenlight(request: GreenlightRequest):
 
         final_text = final_text.strip()
 
-        # ----------------------------------------------------
-        # 9. Parse JSON
-        # ----------------------------------------------------
+    
+
+        print("")
+        print(
+            "[GREENLIGHT] Final agent text:"
+        )
+
+        print(
+            final_text[:10000]
+        )
+
+        print(
+            "[END FINAL AGENT TEXT]"
+        )
+
+   
 
         try:
-            report = json.loads(final_text)
+
+            report = json.loads(
+                final_text
+            )
 
         except json.JSONDecodeError as e:
+
+            print("")
+            print(
+                "[PARSER] Final response was not JSON."
+            )
+
+            print(
+                "[PARSER] Response:"
+            )
+
+            print(
+                final_text[:5000]
+            )
+
             raise RuntimeError(
-                "The agent returned text, but it was not valid JSON. "
-                f"Agent response: {final_text[:2000]}"
+                "The agent returned text, "
+                "but it was not valid JSON. "
+                f"Agent response: "
+                f"{final_text[:2000]}"
             ) from e
 
-        # ----------------------------------------------------
-        # 10. Return report to React
-        # ----------------------------------------------------
+    
 
-        print("[GREENLIGHT] Report successfully parsed.")
+        print("")
+        print(
+            "=" * 60
+        )
+
+        print(
+            "[GREENLIGHT] Report successfully parsed."
+        )
+
+        print(
+            "=" * 60
+        )
+
+        print("")
 
         return report
 
     except HTTPException:
         raise
 
+
+
     except Exception as e:
 
+        print("")
         print(
-            f"[GREENLIGHT ERROR] "
-            f"{type(e).__name__}: {e}"
+            "=" * 60
         )
+
+        print(
+            "[GREENLIGHT ERROR]",
+            f"{type(e).__name__}: {e}",
+        )
+
+        print(
+            "=" * 60
+        )
+
+        print("")
 
         raise HTTPException(
             status_code=500,
@@ -334,11 +585,8 @@ async def greenlight(request: GreenlightRequest):
         ) from e
 
 
-# ============================================================
-# MAIN
-# ============================================================
-
 if __name__ == "__main__":
+
     import uvicorn
 
     uvicorn.run(
