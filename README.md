@@ -101,7 +101,7 @@ npm run dev
 ## Live Project 
 https://cinemahackathon.vercel.app
 
-##Project Demo
+## Project Demo
 https://youtu.be/DP98Egp1gGY
 
 ## Repository
