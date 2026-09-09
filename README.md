@@ -1,15 +1,15 @@
 # Greenlight Report - AI Powered Movies Pitch Market Research Agent 
-## Built for the Agentic Cinema Hackathon -Parallel Track
+## Built for the Agentic Cinema Hackathon - Parallel Track
 
 ## What it Does 
 
-A producer describes a film pitch in plain language (genre, budget , target audience). The agent researches the live market - competing films , box office performance , audience trends , critical reception , and market gaps by using Parallel's Search API . It then synthesises everything into a structured Greenlight Report : a verdict (Pass or Fail), a confidence score, name comps with sources , risks and a final recommendation.
+A producer describes a film pitch in plain language (genre, budget, target audience). The agent researches the live market - competing films, box office performance, audience trends, critical reception, and market gaps by using Parallel's Search API . It then synthesises everything into a structured Greenlight Report: a verdict (Pass or Fail), a confidence score, name comps with sources, risks and a final recommendation.
 
-This turns a research process that would normally take a studio analyst hours or days into a single request , with every claim traceble to a real source.
+This turns a research process that would normally take a studio analyst hours or days into a single request, with every claim traceable to a real source.
 
 ## Why This Matters
 
-Early pitch evaluation usually starts with a manual pass: pulling up a handful of comps, checking box office numbers, skimming reviews. It's not that this research doesn't happen — it's that it's slow, inconsistent between people, and easy to skip steps under time pressure. Generic AI chat tools can speed up the writing, but they tend to produce confident-sounding summaries without checking their own facts, which is exactly the wrong failure mode for something meant to inform a real financial decision. This agent doesn't replace a producer's judgment or a full market analysis — it's a first-pass research assistant. It runs the same kind of live lookups a person would (competitors, box office, reviews, trends, gaps), and its instructions require every claim in the output to trace back to an actual source it retrieved during that run, not to invented or remembered figures.That doesn't make the output infallible — web data is noisy and sources can disagree — but it's a defensible starting point, and fast enough to run before a meeting rather than instead of one.
+Early pitch evaluation usually starts with a manual pass: pulling up a handful of comps, checking box office numbers, skimming reviews. It's not that this research doesn't happen — the only problem being that it's slow, inconsistent between people, and easy to skip steps under time pressure. Generic AI chat tools can speed up the writing, but they tend to produce confident-sounding summaries without checking their own facts, which is exactly the wrong failure mode for something meant to inform a real financial decision. This agent doesn't replace a producer's judgment or a full market analysis — it's a first-pass research assistant. It runs the same kind of live lookups a person would (competitors, box office, reviews, trends, gaps), and its instructions require every claim in the output to trace back to an actual source it retrieved during that run, not to invent or remember figures. That doesn't make the output infallible — web data is noisy and sources can disagree — but it's a defensible starting point, and fast enough to run before a meeting in order to enhance further discussion and move projects forward.
 
 ## Architecture
 
@@ -63,7 +63,7 @@ Ever report follows a consistent JSON structure:
 }
 ```
 
-Every claim in the report (every competitor , every trend , every risk), is required by the agent's instructions to trace back to a real URL returned by a Parallel search during that specific run .
+Every claim in the report (every competitor, every trend, every risk), is required by the agent's instructions to trace back to a real URL returned by a Parallel search during that specific run .
 
 ## Setup & Running Locally 
 
