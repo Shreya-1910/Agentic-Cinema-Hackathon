@@ -1,8 +1,7 @@
+
 export default function Navigation({ activeTab, setActiveTab }) {
   const tabs = [
     { id: 'report', label: 'Report', icon: '✦' },
-    { id: 'logs', label: 'Logs', icon: '◉' },
-    { id: 'dashboard', label: 'Dashboard', icon: '▦' },
   ];
 
   return (
@@ -76,6 +75,9 @@ export default function Navigation({ activeTab, setActiveTab }) {
       {/* Navigation */}
       <div
         style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
           display: 'flex',
           alignItems: 'center',
           gap: '5px',
@@ -157,3 +159,5 @@ export default function Navigation({ activeTab, setActiveTab }) {
     </div>
   );
 }
+
+

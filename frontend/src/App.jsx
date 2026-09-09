@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import Navigation from './components/Layout/Navigation';
 import GreenlightReport from './components/GreenlightReport/GreenlightReport';
-import LogViewer from './components/LogViewer/LogViewer';
-import Dashboard from './components/Dashboard/Dashboard';
+
 
 function App() {
   const [activeTab, setActiveTab] = useState('report');
@@ -18,8 +17,7 @@ function App() {
       <main>
         {/* Only ONE of these will show at a time based on activeTab */}
         {activeTab === 'report' && <GreenlightReport />}  {/* ← Only once! */}
-        {activeTab === 'logs' && <LogViewer />}
-        {activeTab === 'dashboard' && <Dashboard />}
+   
       </main>
     </div>
   );
