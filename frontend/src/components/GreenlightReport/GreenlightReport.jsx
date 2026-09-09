@@ -327,7 +327,7 @@ export default function GreenlightReport() {
       );
 
       const response = await fetch(
-        "http://127.0.0.1:8000/api/greenlight",
+        "https://my-agent-backend-272810972122.us-central1.run.app/api/greenlight",
         {
           method: "POST",
           headers: {

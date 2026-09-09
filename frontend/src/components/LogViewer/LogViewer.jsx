@@ -6,7 +6,7 @@ import {
   addAppLog,
 } from "../../utils/appLogs";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://my-agent-backend-272810972122.us-central1.run.app";
 
 function LogEntry({ log }) {
   const levelStyles = {
